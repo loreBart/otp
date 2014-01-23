@@ -503,7 +503,7 @@ public abstract class AbstractConnection extends Thread {
 	final byte[] tock = { 0, 0, 0, 0 };
 
 	try {
-	    receive_loop: while (!done) {
+	    receive_loop: while (!done&&!Thread.interrupted()) {
 		// don't return until we get a real message
 		// or a failure of some kind (e.g. EXIT)
 		// read length and read buffer must be atomic!
@@ -780,6 +780,13 @@ public abstract class AbstractConnection extends Thread {
      */
     public void close() {
 	done = true;
+	// set the interrupted thread of this thread
+	interrupt();
+	// wait the thread to finish
+	try {
+		join(1000);
+	} catch (InterruptedException e1) {/* ignore interrupted exception */
+	}
 	connected = false;
 	synchronized (this) {
 	    try {
@@ -928,6 +935,7 @@ public abstract class AbstractConnection extends Thread {
 	    i = is.read(b, got, len - got);
 
 	    if (i < 0) {
+	    is.close();
 		throw new IOException("expected " + len
 			+ " bytes, got EOF after " + got + " bytes");
 	    } else if (i == 0 && len != 0) {
@@ -942,6 +950,7 @@ public abstract class AbstractConnection extends Thread {
 		got += i;
 	    }
 	}
+	is.close();
 	return got;
     }
 
@@ -1226,6 +1235,7 @@ public abstract class AbstractConnection extends Thread {
 	obuf.write4BE(challenge);
 	obuf.write(digest);
 	obuf.writeTo(socket.getOutputStream());
+    obuf.flush();
 	obuf.close();
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("-> " + "HANDSHAKE sendChallengeReply"
