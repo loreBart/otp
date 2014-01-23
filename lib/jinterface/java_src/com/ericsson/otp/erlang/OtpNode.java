@@ -692,9 +692,9 @@ public class OtpNode extends OtpLocalNode {
 	    this.port = sock.getLocalPort();
 	    OtpNode.this.port = this.port;
 
-	    setDaemon(true);
 	    setName("acceptor");
-	    publishPort();
+	    setDaemon(true);
+
 	    start();
 	}
 
@@ -716,8 +716,15 @@ public class OtpNode extends OtpLocalNode {
 	}
 
 	public void quit() {
-	    unPublishPort();
 	    done = true;
+	    // set the thread's interrupt flag
+	    interrupt();
+        // wait the thread to finish
+	    try {
+		join(1000);
+	    } catch (InterruptedException e1) {/* ignore interrupted exception */
+	    }
+
 	    closeSock(sock);
 	    localStatus(node, false, null);
 	}
@@ -746,17 +753,21 @@ public class OtpNode extends OtpLocalNode {
 
 	@Override
 	public void run() {
+		// as first step publish port
+		try {
+		    publishPort();
+		} catch (final Exception e) {
+		}
 	    Socket newsock = null;
 	    OtpCookedConnection conn = null;
 
 	    localStatus(node, true, null);
 
-	    accept_loop: while (!done) {
+	    accept_loop: while (!done&&!Thread.interrupted()) {
 		conn = null;
 
 		try {
-		    newsock = sock.accept();
-		    //newsock.setSoTimeout(AbstractConnection.SOCKET_TIMEOUT_MILLIS);
+		    if (!Thread.interrupted())newsock = sock.accept();
 		} catch (final Exception e) {
 		    // Problem in java1.2.2: accept throws SocketException
 		    // when socket is closed. This will happen when
@@ -770,11 +781,14 @@ public class OtpNode extends OtpLocalNode {
 		}
 
 		try {
-		    synchronized (connections) {
-			conn = new OtpCookedConnection(OtpNode.this, newsock);
-			conn.setFlags(flags);
-			addConnection(conn);
-		    }
+			if (!Thread.interrupted())
+			{
+			    synchronized (connections) {
+					conn = new OtpCookedConnection(OtpNode.this, newsock);
+					conn.setFlags(flags);
+					addConnection(conn);
+				}
+			}
 		} catch (final OtpAuthException e) {
 			connAttempt((conn != null && conn.name != null)?conn.name:"unknown", true, e);
 		    closeSock(newsock);
@@ -791,7 +805,7 @@ public class OtpNode extends OtpLocalNode {
 
 	    // if we have exited loop we must do this too
 	    unPublishPort();
-	}
+	} // run
     }
 
     public void setFlags(final int flags) {
