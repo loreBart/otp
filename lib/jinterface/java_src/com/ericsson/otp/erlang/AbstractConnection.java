@@ -21,7 +21,6 @@ package com.ericsson.otp.erlang;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.Socket;
 import java.util.Random;
 
@@ -507,20 +506,17 @@ public abstract class AbstractConnection extends Thread {
 		// don't return until we get a real message
 		// or a failure of some kind (e.g. EXIT)
 		// read length and read buffer must be atomic!
-		/*tick_loop:*/ do {
+		tick_loop: do {
 		    // read 4 bytes - get length of incoming packet
 		    // socket.getInputStream().read(lbuf);
 		    readSock(socket, lbuf);
 		    ibuf = new OtpInputStream(lbuf, flags);
 		    len = ibuf.read4BE();
-		    ibuf.close();
+
 		    // received tick? send tock!
 		    if (len == 0) {
 			synchronized (this) {
-				OutputStream out = socket.getOutputStream();
-				out.write(tock);
-				out.flush();
-				out.close();
+			    socket.getOutputStream().write(tock);
 			}
 		    }
 
@@ -530,7 +526,6 @@ public abstract class AbstractConnection extends Thread {
 		final byte[] tmpbuf = new byte[len];
 		// i = socket.getInputStream().read(tmpbuf);
 		readSock(socket, tmpbuf);
-		if (ibuf!=null)ibuf.close();
 		ibuf = new OtpInputStream(tmpbuf, flags);
 
 		if (ibuf.read1() != passThrough) {
@@ -561,7 +556,6 @@ public abstract class AbstractConnection extends Thread {
 		// lets see what kind of message this is
 		tag = (int) ((OtpErlangLong) head.elementAt(0)).longValue();
 
-		if (ibuf!=null)ibuf.close();
 		switch (tag) {
 		case sendTag: // { SEND, Cookie, ToPid }
 		case sendTTTag: // { SEND, Cookie, ToPid, TraceToken }
@@ -977,18 +971,18 @@ public abstract class AbstractConnection extends Thread {
 	    throw new IOException("Error accepting connection from " + nn);
 	}
 	if (traceLevel >= handshakeThreshold) {
-	    System.out.println("<- MD5 ACCEPTED " + peer.hostName());
+	    System.out.println("<- MD5 ACCEPTED " + peer.hostAddress());
 	}
     }
 
     protected void doConnect(final int port) throws IOException,
 	    OtpAuthException {
 	try {
-	    socket = new Socket(peer.hostAddr(), port);
+	    socket = new Socket(peer.hostAddress(), port);
 	    socket.setTcpNoDelay(true);
 
 	    if (traceLevel >= handshakeThreshold) {
-		System.out.println("-> MD5 CONNECT TO " + peer.hostAddr() + ":"
+		System.out.println("-> MD5 CONNECT TO " + peer.hostAddress() + ":"
 			+ port);
 	    }
 	    sendName(peer.distChoose, self.flags);
@@ -1076,9 +1070,7 @@ public abstract class AbstractConnection extends Thread {
 	obuf.write(str.getBytes());
 
 	obuf.writeTo(socket.getOutputStream());
-	obuf.flush();
-	obuf.close();
-	
+
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("-> " + "HANDSHAKE sendName" + " flags=" + flags
 		    + " dist=" + dist + " local=" + self);
@@ -1098,9 +1090,7 @@ public abstract class AbstractConnection extends Thread {
 	obuf.write(str.getBytes());
 
 	obuf.writeTo(socket.getOutputStream());
-	obuf.flush();
-	obuf.close();
-	
+
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("-> " + "HANDSHAKE sendChallenge" + " flags="
 		    + flags + " dist=" + dist + " challenge=" + challenge
@@ -1119,7 +1109,6 @@ public abstract class AbstractConnection extends Thread {
 	final int len = ibuf.read2BE();
 	tmpbuf = new byte[len];
 	readSock(socket, tmpbuf);
-	ibuf.close();
 	return tmpbuf;
     }
 
@@ -1134,18 +1123,15 @@ public abstract class AbstractConnection extends Thread {
 	    final int len = tmpbuf.length;
 	    peer.ntype = ibuf.read1();
 	    if (peer.ntype != AbstractNode.NTYPE_R6) {
-	    ibuf.close();
 		throw new IOException("Unknown remote node type");
 	    }
 	    peer.distLow = peer.distHigh = ibuf.read2BE();
 	    if (peer.distLow < 5) {
-		    ibuf.close();
 		throw new IOException("Unknown remote node type");
 	    }
 	    peer.flags = ibuf.read4BE();
 	    tmpname = new byte[len - 7];
 	    ibuf.readN(tmpname);
-	    ibuf.close();
 	    hisname = OtpErlangString.newString(tmpname);
 	    // Set the old nodetype parameter to indicate hidden/normal status
 	    // When the old handshake is removed, the ntype should also be.
@@ -1172,7 +1158,7 @@ public abstract class AbstractConnection extends Thread {
 	final int i = hisname.indexOf('@', 0);
 	peer.node = hisname;
 	peer.alive = hisname.substring(0, i);
-	peer.hostName = hisname.substring(i + 1, hisname.length());
+	peer.hostAddr = hisname.substring(i + 1, hisname.length());
 
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("<- " + "HANDSHAKE" + " ntype=" + peer.ntype
@@ -1189,7 +1175,6 @@ public abstract class AbstractConnection extends Thread {
 	    final OtpInputStream ibuf = new OtpInputStream(buf, 0);
 	    peer.ntype = ibuf.read1();
 	    if (peer.ntype != AbstractNode.NTYPE_R6) {
-		ibuf.close();
 		throw new IOException("Unexpected peer type");
 	    }
 	    peer.distLow = peer.distHigh = ibuf.read2BE();
@@ -1197,7 +1182,6 @@ public abstract class AbstractConnection extends Thread {
 	    challenge = ibuf.read4BE();
 	    final byte[] tmpname = new byte[buf.length - 11];
 	    ibuf.readN(tmpname);
-	    ibuf.close();
 	    final String hisname = OtpErlangString.newString(tmpname);
 	    if (!hisname.equals(peer.node)) {
 		throw new IOException(
@@ -1235,8 +1219,7 @@ public abstract class AbstractConnection extends Thread {
 	obuf.write4BE(challenge);
 	obuf.write(digest);
 	obuf.writeTo(socket.getOutputStream());
-    obuf.flush();
-	obuf.close();
+
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("-> " + "HANDSHAKE sendChallengeReply"
 		    + " challenge=" + challenge + " digest=" + hex(digest)
@@ -1266,12 +1249,10 @@ public abstract class AbstractConnection extends Thread {
 	    final OtpInputStream ibuf = new OtpInputStream(buf, 0);
 	    final int tag = ibuf.read1();
 	    if (tag != ChallengeReply) {
-			ibuf.close();
 		throw new IOException("Handshake protocol error");
 	    }
 	    challenge = ibuf.read4BE();
 	    ibuf.readN(her_digest);
-		ibuf.close();
 	    final byte[] our_digest = genDigest(our_challenge, self.cookie());
 	    if (!digests_equals(her_digest, our_digest)) {
 		throw new OtpAuthException("Peer authentication error.");
@@ -1297,9 +1278,7 @@ public abstract class AbstractConnection extends Thread {
 	obuf.write(digest);
 
 	obuf.writeTo(socket.getOutputStream());
-	obuf.flush();
-	obuf.close();
-	
+
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("-> " + "HANDSHAKE sendChallengeAck"
 		    + " digest=" + hex(digest) + " local=" + self);
@@ -1315,16 +1294,13 @@ public abstract class AbstractConnection extends Thread {
 	    final OtpInputStream ibuf = new OtpInputStream(buf, 0);
 	    final int tag = ibuf.read1();
 	    if (tag != ChallengeAck) {
-	    ibuf.close();
 		throw new IOException("Handshake protocol error");
 	    }
 	    ibuf.readN(her_digest);
 	    final byte[] our_digest = genDigest(our_challenge, self.cookie());
 	    if (!digests_equals(her_digest, our_digest)) {
-		ibuf.close();
 		throw new OtpAuthException("Peer authentication error.");
 	    }
-	    ibuf.close();
 	} catch (final OtpErlangDecodeException e) {
 	    throw new IOException("Handshake failed - not enough data");
 	} catch (final Exception e) {
@@ -1346,9 +1322,7 @@ public abstract class AbstractConnection extends Thread {
 	obuf.write(status.getBytes());
 
 	obuf.writeTo(socket.getOutputStream());
-	obuf.flush();
-	obuf.close();
-	
+
 	if (traceLevel >= handshakeThreshold) {
 	    System.out.println("-> " + "HANDSHAKE sendStatus" + " status="
 		    + status + " local=" + self);
@@ -1362,20 +1336,16 @@ public abstract class AbstractConnection extends Thread {
 	    final OtpInputStream ibuf = new OtpInputStream(buf, 0);
 	    final int tag = ibuf.read1();
 	    if (tag != ChallengeStatus) {
-	    	ibuf.close();
-	    	throw new IOException("Handshake protocol error");
+		throw new IOException("Handshake protocol error");
 	    }
 	    final byte[] tmpbuf = new byte[buf.length - 1];
 	    ibuf.readN(tmpbuf);
 	    final String status = OtpErlangString.newString(tmpbuf);
 
 	    if (status.compareTo("ok") != 0) {
-	    	ibuf.close();
-	    	throw new IOException("Peer replied with status '" + status
+		throw new IOException("Peer replied with status '" + status
 			+ "' instead of 'ok'");
 	    }
-    	ibuf.close();
-
 	} catch (final OtpErlangDecodeException e) {
 	    throw new IOException("Handshake failed - not enough data");
 	}

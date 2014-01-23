@@ -67,7 +67,9 @@ import java.net.UnknownHostException;
 public class AbstractNode {
     static String localHost = null;
     String node;
+    // The name of the host
     String hostName;
+    // The ip address of the node
     String hostAddr;
     String alive;
     String cookie;
@@ -159,23 +161,25 @@ public class AbstractNode {
     }
 
     /**
-     * Create a node with the given name, cookie and address.
+     * Create a node with the given parameters
+     * 
+     * @param aliveName The alive name of the host
+     * @param hostName The dns name of the node
+     * @param hostIp The Ip address of the node
+     * @param cookie Cookie used
      */
-    protected AbstractNode(final String name, final String cookie, final String addr) {
+    protected AbstractNode(final String nodeName, final String cookie, final String hostIp) {
 	this.cookie = cookie;
 
-	final int i = name.indexOf('@', 0);
+	final int i = nodeName.indexOf('@', 0);
 	if (i < 0) {
-	    alive = name;
+	    alive = nodeName;
 	    hostName = localHost;
 	    hostAddr = "127.0.0.1";
 	} else {
-	    alive = name.substring(0, i);
-	    hostName = name.substring(i + 1, name.length());
-	    if (addr!=null)
-	    	hostAddr = addr;
-	    else
-	    	hostAddr = hostName;
+	    alive = nodeName.substring(0, i);
+	    hostName = nodeName.substring(i + 1, nodeName.length());
+	    hostAddr = hostIp!=null?hostIp:hostName;
 	}
 
 	if (alive.length() > 0xff) {
@@ -194,26 +198,44 @@ public class AbstractNode {
 	return node;
     }
 
+
     /**
-     * Get the hostname part of the nodename. Nodenames are composed of two
-     * parts, an alivename and a hostname, separated by '@'. This method returns
-     * the part of the nodename following the '@'.
+     * Get the alive name part of the node name. Node names are composed of two
+     * parts, an alive name and a host name, separated by '@'. This method returns
+     * the part of the alive name preceding the '@'.
      * 
-     * @return the hostname component of the nodename.
+     * @return the alive name component of the node name.
+     */
+    public String aliveName() {
+	return alive;
+    }
+    /**
+     * Get the host name part of the node name. Node names are composed of two
+     * parts, an alive name and a host name, separated by '@'. This method returns
+     * the part of the node name following the '@'.
+     * 
+     * @return the host name component of the node name.
      */
     public String hostName() {
 	return hostName;
     }
-    public String hostAddr() {
+    /**
+     * Get the ip address of this node. This address can be
+     * a dns name if no ip address has been specified building this object
+     * and in this case it coincides with the host name
+     * 
+     * @return the address of the node represented by this object.
+     */
+    public String hostAddress() {
 	return hostAddr;
     }
 
     /**
-     * Get the alivename part of the hostname. Nodenames are composed of two
-     * parts, an alivename and a hostname, separated by '@'. This method returns
-     * the part of the nodename preceding the '@'.
+     * Get the alive name part of the host name. Node names are composed of two
+     * parts, an alive name and a host name, separated by '@'. This method returns
+     * the part of the node name preceding the '@'.
      * 
-     * @return the alivename component of the nodename.
+     * @return the alive name component of the node name.
      */
     public String alive() {
 	return alive;

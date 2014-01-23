@@ -790,10 +790,18 @@ public class OtpNode extends OtpLocalNode {
 				}
 			}
 		} catch (final OtpAuthException e) {
-			connAttempt((conn != null && conn.name != null)?conn.name:"unknown", true, e);
+		    if (conn != null && conn.name != null) {
+			connAttempt(conn.name, true, e);
+		    } else {
+			connAttempt("unknown", true, e);
+		    }
 		    closeSock(newsock);
 		} catch (final IOException e) {
-			connAttempt((conn != null && conn.name != null)?conn.name:"unknown", true, e);
+		    if (conn != null && conn.name != null) {
+			connAttempt(conn.name, true, e);
+		    } else {
+			connAttempt("unknown", true, e);
+		    }
 		    closeSock(newsock);
 		} catch (final Exception e) {
 		    closeSock(newsock);
